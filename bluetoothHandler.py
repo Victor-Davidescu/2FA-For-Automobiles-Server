@@ -147,8 +147,3 @@ class BluetoothHandler (threading.Thread):
         # Close sockets
         self._CloseClientSocket()
         self._CloseServerSocket()
-
-
-logging.basicConfig(level="DEBUG")
-myBt = BluetoothHandler(1)
-myBt.start()
