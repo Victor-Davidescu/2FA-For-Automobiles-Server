@@ -5,6 +5,8 @@
 import third_party_drivers.I2C_LCD_driver as LCDDriver
 import RPi.GPIO as GPIO
 import time
+import logging
+import threading
 
 # Own Modules
 from config import Configurations
@@ -13,92 +15,93 @@ from relay import RelaySwitch
 from authentication import Authentication
 from bluetoothHandler import BluetoothHandler
 
+################################################################################
+# Class Main
+################################################################################
 class Main:
 
+    ############################################################################
+    # Function 
+    ############################################################################
     def __init__(self):
+
         # Setup GPIO to use Broadcom uses the actual pin number
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
-
+        self.keepRunning = True
         self.config = Configurations("config.conf")
-        self.mainRelay = RelaySwitch(self.config.relayPin)
-
-        self.mainLCD = LCDDriver.lcd()
-
         self.mainBluetooth = BluetoothHandler(int(self.config.bluetoothPin))
-
-        self.mainBluetooth.start()
-
-
-        """
+        self.mainRelay = RelaySwitch(self.config.relayPin)
+        self.mainLCD = LCDDriver.lcd()
         self.mainKepad = Keypad(
-            self.config.rowLength,
-            self.config.columnLength,
+            self.config.rowLength, 
+            self.config.columnLength, 
             self.config.keypadRowPins,
             self.config.keypadColumnPins,
             self.config.keys)
         self.mainAuth = Authentication(
             self.config.pepper, 
             self.config.dbLocation)
-        """
-        
 
 
-    def Loop(self):
+    ############################################################################
+    # Function 
+    ############################################################################
+    def CheckDataFromBT(self):
 
-        self.mainLCD.lcd_display_string("BT Disconnected ", 1)
-        self.mainLCD.lcd_display_string("LOCKED", 2)
+        # Check if the queue for received Data is not empty
+        if(not self.mainBluetooth.inData.empty()):
 
-        #self.mainBluetooth.InitiateConnection()
-        self.mainLCD.lcd_display_string("BT Connected    ", 1)
+            data = self.mainBluetooth.inData.get()
+            logging.info("Data received: {0}".format(data))
 
-        loop = True
-        while(loop):
+            if(data == "lock"):
+                self.mainRelay.OFF()
+                msg = "Relay should be off.\n"
 
-            time.sleep(1)
-
-            """
-            if(self.mainKepad.ReadKey() == 'A'):
+            elif(data == "unlock"):
                 self.mainRelay.ON()
-                self.mainLCD.lcd_display_string("Relay: OPEN", 2)
+                msg = "Relay should be on.\n"
 
-            elif(self.mainKepad.ReadKey() == 'B'):
-                self.mainRelay.OFF()
-                self.mainLCD.lcd_display_string("Relay: CLOSED", 2)
+            elif(data == "shutdown"):
+                msg = "Shutdown received.\n"
+                self.mainBluetooth.keepRunning = False
+                self.keepRunning = False
 
-            elif(self.mainKepad.ReadKey() == 'C'):
-                loop = False
-            """
+            else:
+                msg = "Unkown message received.\n"
 
-            if(self.mainBluetooth.ReceiveMessage() == 'unlock'):
-                print("unlock")
-                self.mainRelay.ON()
-                self.mainLCD.lcd_display_string("UNLOCKED", 2)
-
-            elif(self.mainBluetooth.ReceiveMessage() == 'lock'):
-                print("lock")
-                self.mainRelay.OFF()
-                self.mainLCD.lcd_display_string("LOCKED  ", 2)
-
-            elif(self.mainBluetooth.ReceiveMessage() == 'exit'):
-                print("exit")
-                self.mainRelay.OFF()
-                self.mainBluetooth.CloseConnection()
-                self.mainLCD.lcd_display_string("BT Disconnected ", 1)
-                loop = False
+            self.mainBluetooth.inData.task_done()
+            self.mainBluetooth.outData.put(msg)
 
 
+    ############################################################################
+    # Function 
+    ############################################################################
+    def Main(self):
 
-        self.mainLCD.lcd_clear()
-        self.mainLCD.lcd_display_string("Stopping...", 1)
-        time.sleep(1)
+        # Display a message on LCD
+        self.mainLCD.lcd_display_string("2FA Running", 1)
+
+        # Start a separate thread for bluetooth communications
+        self.mainBluetooth.start()
+
+        # Start main loop
+        while(self.keepRunning):
+
+            # Check if any data is received from BT
+            self.CheckDataFromBT()
+
+        # Once the bt thread ends it will rejoin here
+        self.mainBluetooth.join()
+
+        # Clean the GPIO and the LCD screen
         self.mainLCD.lcd_clear()
         GPIO.cleanup()
 
 
-
 # Starting Point
 if __name__ == "__main__":
+    logging.basicConfig(level="DEBUG")
     main = Main()
-    #main.Loop()
-    
+    main.Main()
