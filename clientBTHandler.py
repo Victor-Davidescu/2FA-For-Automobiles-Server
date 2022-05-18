@@ -11,7 +11,7 @@ import logging
 ################################################################################
 # Class Bluetooth handler
 ################################################################################
-class BluetoothHandler (threading.Thread):
+class ClientBTHandler (threading.Thread):
 
     ############################################################################
     # Function 

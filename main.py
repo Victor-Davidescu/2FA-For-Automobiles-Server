@@ -13,7 +13,7 @@ from config import Configurations
 from keypad import Keypad
 from relay import RelaySwitch
 from authentication import Authentication
-from bluetoothHandler import BluetoothHandler
+from clientBTHandler import ClientBTHandler
 
 ################################################################################
 # Class Main
@@ -30,7 +30,7 @@ class Main:
         GPIO.setwarnings(False)
         self.keepRunning = True
         self.config = Configurations("config.conf")
-        self.mainBluetooth = BluetoothHandler(int(self.config.bluetoothPin))
+        self.mainBluetooth = ClientBTHandler(int(self.config.bluetoothPin))
         self.mainRelay = RelaySwitch(self.config.relayPin)
         self.mainLCD = LCDDriver.lcd()
         self.mainKepad = Keypad(
