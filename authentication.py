@@ -14,20 +14,7 @@ class Authentication():
     def __init__(self, pepper, dbPath) -> None:
         self.pepper = pepper
         self.database = Database(dbPath)
-
-    ############################################################################
-    # Function 
-    ############################################################################
-    def RetreiveNewUserID(self):
-        records = self.database.RetreiveAllRecords()
-        return len(records)
-
-    ############################################################################
-    # Function 
-    ############################################################################
-    def ResetDatabase(self):
-        self.database.DeleteTable()
-        self.database.CreateTable()
+        self.database.ConnectToDB()
 
 
     ############################################################################
@@ -41,11 +28,8 @@ class Authentication():
         # Hash the pin with salt and pepper
         pinHashed = hashlib.sha256(salt.encode() + pin.encode()  + self.pepper.encode())
 
-        # Obtain new user ID
-        userID = self.RetreiveNewUserID()
-
         # Append user in the database
-        self.database.CreateUser(userID, name, salt, pinHashed.hexdigest())
+        self.database.CreateUser(name, salt, pinHashed.hexdigest())
 
 
     ############################################################################
@@ -54,13 +38,15 @@ class Authentication():
     def CheckUserPin(self, name, pin) -> bool:
 
         # Obtain salt and hashed pin from database
-        (saltFromDB, pinHashedFromDB) = self.database.RetreiveUserDetails(name)
+        (saltFromDB, pinHashedFromDB) = self.database.GetSaltAndHashFromUser(name)
 
-        # Hash the obtained pin
-        pinHashed = hashlib.sha256(saltFromDB.encode() + pin.encode() + self.pepper.encode())
+        # Check if salt and hash value are none, if they are none no user was found
+        if(saltFromDB is not None and pinHashedFromDB is not None):
 
-        # Compare the hashed pin with the hashed pin from the database
-        if(pinHashed.hexdigest() == pinHashedFromDB):
-            return True
-        else:
-            return False
+            # Hash the obtained pin
+            pinHashed = hashlib.sha256(saltFromDB.encode() + pin.encode() + self.pepper.encode())
+
+            # Return comparison result
+            return pinHashed.hexdigest() == pinHashedFromDB
+
+        else: return False
