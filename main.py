@@ -70,6 +70,9 @@ class Main:
     ############################################################################
     def Main(self):
 
+        # Making sure the relay stays locked at the beginning of the program
+        self.mainRelay.OFF()
+
         # Display a message on LCD
         self.mainLCD.lcd_display_string("2FA Running", 1)
 
