@@ -2,6 +2,7 @@
 # Author: Victor Davidescu
 # SID: 1705734
 ################################################################################
+from subprocess import TimeoutExpired
 import bluetooth
 import threading
 import queue
@@ -19,10 +20,11 @@ class ClientBTHandler (threading.Thread):
     def __init__(self, port:int, pepper, dbPath) -> None:
         threading.Thread.__init__(self)
         self._serverSocket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        self._serverSocket.settimeout(10)
         self._clientSocket = None
         self._clientAddress = None
         self._port = port
-        self._clientConnected = False
+        self.clientConnected = False
         self._clientAuthenticated = False
         self._pepper = pepper
         self._dbPath = dbPath
@@ -57,15 +59,20 @@ class ClientBTHandler (threading.Thread):
     ############################################################################
     def _WaitClientConnection(self) -> None:
         logging.info("Waiting for a client to connect.")
-        self._clientSocket, self._clientAddress = self._serverSocket.accept()
-        logging.info("Client connected.")
-        self._clientConnected = True
+        try:
+            self._clientSocket, self._clientAddress = self._serverSocket.accept()
+        except Exception as err:
+            logging.error("{0}".format(err))
+        else:
+            logging.info("Client connected.")
+            self.clientConnected = True
 
 
     ############################################################################
     # Function 
     ############################################################################
     def _ReceiveData(self) -> None:
+
         try: dataBytes = self._clientSocket.recv(1024)
         except Exception as error:
             logging.error("Failed to retreive message. Details: {0}".format(error))
@@ -140,9 +147,9 @@ class ClientBTHandler (threading.Thread):
 
         elif(data == "shutdown"):
             if(self._clientAuthenticated):
+                self.keepRunning = False
                 self.cmdQueue.put(data)
                 self._SendData("2FA is shutting down.")
-                self.keepRunning = False
             else: self._SendData("You need to authenticate first. Use 'login' command.")
                 
         else:
@@ -156,9 +163,9 @@ class ClientBTHandler (threading.Thread):
     ############################################################################
     def _CloseClientSocket(self) -> None:
         try:
-            self._clientSocket.close()
-            self._clientConnected = False
+            self.clientConnected = False
             self._clientAuthenticated = False
+            self._clientSocket.close()
             logging.info("Disconnected the client.")
 
         except Exception as error:
@@ -193,14 +200,17 @@ class ClientBTHandler (threading.Thread):
         # Start the main thread loop
         while(self.keepRunning):
 
-            # If client is not connected, wait to connect back
-            if(not self._clientConnected): self._WaitClientConnection()
+            # Check if a client is connected
+            if(not self.clientConnected):
+                # If client is not connected, wait to connect back
+                self._WaitClientConnection()
 
-            # Wait for the client to send data
-            if(self._clientConnected): data = self._ReceiveData()
+            else:
+                # Wait for the client to send data
+                data = self._ReceiveData()
 
-            # Process the data received from client    
-            self._ProcessInputData(data)
+                # Process the data received from client    
+                self._ProcessInputData(data)
 
         # Close sockets
         self._CloseClientSocket()

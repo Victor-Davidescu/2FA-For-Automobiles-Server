@@ -26,9 +26,13 @@ class Main:
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         self.keepRunning = True
+
         self.config = Configurations("config.conf")
-        self.mainBluetooth = ClientBTHandler(int(self.config.bluetoothPin),self.config.pepper, 
+        self.mainBT = ClientBTHandler(
+            int(self.config.bluetoothPin),
+            self.config.pepper, 
             self.config.dbLocation)
+
         self.mainRelay = RelaySwitch(self.config.relayPin)
         self.mainLCD = LCDDriver.lcd()
         self.mainKepad = Keypad(
@@ -36,33 +40,50 @@ class Main:
             self.config.columnLength, 
             self.config.keypadRowPins,
             self.config.keypadColumnPins,
-            self.config.keys)
+            self.config.keys,
+            self.config.defaultUser,
+            self.config.pepper, 
+            self.config.dbLocation)
 
 
     ############################################################################
     # Function 
     ############################################################################
-    def CheckCMDQueueFromBT(self):
+    def ProcessCMD(self, cmd:str):
+        # Switch ON/OFF the relay
+        if(cmd == "switch"):
+            if(self.mainRelay.Status()): self.mainRelay.OFF()
+            else: self.mainRelay.ON()
 
-        # Check if the queue is not empty
-        if(not self.mainBluetooth.cmdQueue.empty()):
+        # Shutdown program
+        elif(cmd == "shutdown"):
 
-            cmd = self.mainBluetooth.cmdQueue.get()
-            logging.info("Command received from BT: {0}".format(cmd))
-
-            if(cmd == "lock"):
-                self.mainRelay.OFF()
-                logging.debug("Relay should switch off.")
-
-            elif(cmd == "unlock"):
-                self.mainRelay.ON()
-                logging.debug("Relay should switch on.")
-
-            elif(cmd == "shutdown"):
-                self.mainBluetooth.keepRunning = False
+            if(not self.mainBT.clientConnected):
                 self.keepRunning = False
+                self.mainBT.keepRunning = False
+                self.mainKepad.keepRunning = False
+            else:
+                logging.error("Cannot shutdown, because there is an active BT connection.")
 
-            self.mainBluetooth.cmdQueue.task_done()
+        else: logging.debug("Unkown command received.")
+
+
+    ############################################################################
+    # Function 
+    ############################################################################
+    def CheckCMDQueue(self, queueFromBT:bool):
+        cmd = None
+        # Get cmds from BT queue if requested and available
+        if(queueFromBT and not self.mainBT.cmdQueue.empty()):
+            cmd = self.mainBT.cmdQueue.get()
+            self.mainBT.cmdQueue.task_done()
+
+        # Get cmds from keypad queue if requested and available
+        if(not queueFromBT and not self.mainKepad.cmdQueue.empty()):
+            cmd = self.mainKepad.cmdQueue.get()
+            self.mainKepad.cmdQueue.task_done()
+
+        return cmd
 
 
     ############################################################################
@@ -74,24 +95,32 @@ class Main:
         self.mainRelay.OFF()
 
         # Display a message on LCD
-        self.mainLCD.lcd_display_string("2FA Running", 1)
+        #self.mainLCD.lcd_display_string("2FA Running", 1)
 
-        # Start a separate thread for bluetooth communications
-        self.mainBluetooth.start()
+        # Start a separate thread for BT and keypad communication
+        self.mainBT.start()
+        self.mainKepad.start()
 
         # Start main loop
         while(self.keepRunning):
-
-            # Check if any data is received from BT
-            self.CheckCMDQueueFromBT()
-
             time.sleep(1)
 
+            # Check and process any command from keypad
+            cmd = self.CheckCMDQueue(False)
+            if(cmd is not None):
+                self.ProcessCMD(cmd)
+
+            # Check and process any command from BT
+            cmd = self.CheckCMDQueue(True)
+            if(cmd is not None):
+                self.ProcessCMD(cmd)
+
         # Once the bt thread ends it will rejoin here
-        self.mainBluetooth.join()
+        self.mainBT.join()
+        self.mainKepad.join()
 
         # Clean the GPIO and the LCD screen
-        self.mainLCD.lcd_clear()
+        #self.mainLCD.lcd_clear()
         GPIO.cleanup()
 
 

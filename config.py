@@ -14,6 +14,7 @@ class Configurations:
         self.keypadColumnPins = config.get('gpio_pins','keypad_column_pins').split(',')
 
         # Keypad
+        self.defaultUser = config.get('keypad','default_user').replace("'",'')
         self.rowLength = config.getint('keypad','row_length')
         self.columnLength = config.getint('keypad','column_length')
         self.keys = []
