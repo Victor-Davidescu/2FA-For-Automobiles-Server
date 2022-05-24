@@ -2,7 +2,6 @@
 # Author: Victor Davidescu
 # SID: 1705734
 ################################################################################
-from subprocess import TimeoutExpired
 import bluetooth
 import threading
 import queue
@@ -15,7 +14,7 @@ from authentication import Authentication
 class ClientBTHandler (threading.Thread):
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def __init__(self, port:int, pepper, dbPath) -> None:
         threading.Thread.__init__(self)
@@ -33,7 +32,7 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _BindToPort(self) -> None:
         try: self._serverSocket.bind(("", self._port))
@@ -44,7 +43,7 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _StartListening(self) -> None:
         try: self._serverSocket.listen(1)
@@ -55,7 +54,7 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _WaitClientConnection(self) -> None:
         logging.info("Waiting for a client to connect.")
@@ -69,21 +68,21 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _ReceiveData(self) -> None:
 
         try: dataBytes = self._clientSocket.recv(1024)
         except Exception as error:
             logging.error("Failed to retreive message. Details: {0}".format(error))
-            self._CloseClientSocket()  
+            self._CloseClientSocket()
         else:
             data = dataBytes.decode('utf-8').rstrip()
             return data
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _SendData(self, data:str) -> None:
         # Check if data is empty
@@ -96,20 +95,20 @@ class ClientBTHandler (threading.Thread):
             try: self._clientSocket.send(data.encode())
             except Exception as error:
                 logging.error("Failed to send message. Details: {0}".format(error))
-                self._CloseClientSocket()            
+                self._CloseClientSocket()
             else: logging.debug("Message sent successfully.")
 
         else: logging.error("The data received for sending is empty.")
-        
+
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _AuthenticateClient(self):
         if(not self._clientAuthenticated):
             self._SendData("Enter your username:")
             username = self._ReceiveData()
-         
+
             # Allow maximum 3 attempts for the pin
             for attempt in range(3,0,-1):
                 self._SendData("Enter your pin:")
@@ -119,7 +118,7 @@ class ClientBTHandler (threading.Thread):
                 if(self.auth.CheckUserPin(username,pin)):
                     self._clientAuthenticated = True
                     self._SendData("Authenticated successfully.\n")
-                    break         
+                    break
                 else: self._SendData("Wrong pin, you have {0} attempts left.\n".format(attempt-1))
 
             # Check if the client is authenticated, if not close the connection
@@ -129,13 +128,13 @@ class ClientBTHandler (threading.Thread):
 
         else: self._SendData("You are already logged in.\n")
 
-                
+
     ############################################################################
-    # Function 
-    ############################################################################                
+    # Function
+    ############################################################################
     def _ProcessInputData(self, data):
 
-        if(data == "disconnect"): 
+        if(data == "disconnect"):
             self._CloseClientSocket()
 
         elif(data == "login"):
@@ -151,7 +150,7 @@ class ClientBTHandler (threading.Thread):
                 self.cmdQueue.put(data)
                 self._SendData("2FA is shutting down.")
             else: self._SendData("You need to authenticate first. Use 'login' command.")
-                
+
         else:
             if(self._clientAuthenticated):
                 self.cmdQueue.put(data)
@@ -159,7 +158,7 @@ class ClientBTHandler (threading.Thread):
             else: self._SendData("You need to authenticate first. Use 'login' command.")
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _CloseClientSocket(self) -> None:
         try:
@@ -173,7 +172,7 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _CloseServerSocket(self) -> None:
         try:
@@ -184,7 +183,7 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
-    # Main Thread Function 
+    # Main Thread Function
     ############################################################################
     def run(self) -> None:
 
@@ -209,7 +208,7 @@ class ClientBTHandler (threading.Thread):
                 # Wait for the client to send data
                 data = self._ReceiveData()
 
-                # Process the data received from client    
+                # Process the data received from client
                 self._ProcessInputData(data)
 
         # Close sockets
