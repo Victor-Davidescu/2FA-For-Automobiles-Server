@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from config import Configurations
 from database import Database
 
 
@@ -9,19 +10,25 @@ from database import Database
 class Authentication():
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
-    def __init__(self, pepper, dbPath) -> None:
-        self.pepper = pepper
-        self.database = Database(dbPath)
+    def __init__(self) -> None:
+
+        # Get neccessary configurations
+        self.config = Configurations()
+        self.pepper = self.config.GetString('hash','pepper_value')
+        del self.config
+
+        # Establish a connection to DB
+        self.database = Database()
         self.database.ConnectToDB()
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def AddUserInDB(self, name, pin):
-        
+
         # Generate random salt value
         salt = secrets.token_hex(32)
 
@@ -33,7 +40,7 @@ class Authentication():
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def CheckUserPin(self, name, pin) -> bool:
 

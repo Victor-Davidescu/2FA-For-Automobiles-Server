@@ -7,7 +7,9 @@ import time
 import threading
 import queue
 import logging
+from buzzer import Buzzer
 from authentication import Authentication
+from config import Configurations
 
 
 ################################################################################
@@ -21,19 +23,23 @@ class Keypad (threading.Thread):
     ############################################################################
     # Class Constructor
     ############################################################################
-    def __init__(self, rowLength, columnLength, rowPins, columnPins, keys, defaultUser,pepper,dbPath):
+    def __init__(self):
         threading.Thread.__init__(self)
-        self._rowLength = rowLength
-        self._columnLength = columnLength
-        self._rowPins = rowPins
-        self._columnPins = columnPins
-        self._keys = keys
-        self._defaultUser = defaultUser
-        self._pepper = pepper
-        self._dbPath = dbPath
+
+        # Get necessary configurations
+        config = Configurations()
+        self._rowLength = config.GetInt('keypad','row_length')
+        self._columnLength = config.GetInt('keypad','column_length')
+        self._rowPins = config.GetIntList('gpio_pins','keypad_row_pins')
+        self._columnPins = config.GetIntList('gpio_pins','keypad_column_pins')
+        self._keys = config.GetKeypadKeysList('keypad','keys')
+        self._defaultUser = config.GetString('keypad','default_user')
+        buzzerPin = config.GetInt('gpio_pins','buzzer_pin')
+
+        self.buzzer = Buzzer(buzzerPin)
         self._userAuthenticated = False
         self.cmdQueue = queue.Queue()
-        self.keepRunning = True
+        self._keepRunning = True
 
         self._SetupGPIOPins()
 
@@ -57,7 +63,7 @@ class Keypad (threading.Thread):
         keyReceived = None
 
         # Loop until an input is received
-        while (keyReceived is None and self.keepRunning):
+        while (keyReceived is None and self._keepRunning):
             time.sleep(0.1)
 
             # Interate thorugh row pins
@@ -73,10 +79,11 @@ class Keypad (threading.Thread):
                     if(GPIO.input(int(pinColumn)) == 1):
                         keyReceived = self._keys[indexRow][indexColumn]
                         logging.debug("From keypad received key '{0}'.".format(keyReceived))
+                        self.buzzer.Beep()
 
                 # Stop sending an output on the current row pin
                 GPIO.output(int(pinRow), GPIO.LOW)
-        
+
         return keyReceived
 
 
@@ -92,7 +99,7 @@ class Keypad (threading.Thread):
         pinReceived = False
 
         # Loop until user enters the PIN or it cancels
-        while(loop and self.keepRunning):
+        while(loop and self._keepRunning):
             # Avoid getting repeated keys
             time.sleep(1)
 
@@ -111,7 +118,7 @@ class Keypad (threading.Thread):
             elif(key == 'C'): # C for reseting PIN
                 logging.debug("PIN resetted")
                 pin = ""
-            
+
             elif(key.isdigit()):
                 pin = pin + key
 
@@ -120,12 +127,14 @@ class Keypad (threading.Thread):
             if(self.auth.CheckUserPin(self._defaultUser,pin)):
                 logging.debug("Authentication is successful.")
                 self._userAuthenticated = True
+                self.buzzer.Beep(noOfBeeps=2)
             else:
                 logging.debug("Authentication failed.")
+                self.buzzer.Beep(longBeep=True)
         else:
             logging.debug("Authentication is cancelled")
 
-    
+
     ############################################################################
     # Function
     ############################################################################
@@ -134,7 +143,10 @@ class Keypad (threading.Thread):
         if(self._userAuthenticated):
             logging.debug("User logged out.")
             self._userAuthenticated = False
-        else: self._Authenticate()
+        else:
+            self.buzzer.Beep(noOfBeeps=2)
+            self._Authenticate()
+
 
 
     ############################################################################
@@ -151,10 +163,9 @@ class Keypad (threading.Thread):
     # Function
     ############################################################################
     def _KeyFunctionC(self):
-        if(self._userAuthenticated):
-            logging.debug("User requested to shutdown the program")
-            self.cmdQueue.put("shutdown")
-        else: logging.debug("Shutdown command denied.")
+        logging.debug("User requested to shutdown the program")
+        self.cmdQueue.put("shutdown")
+
 
 
     ############################################################################
@@ -170,6 +181,12 @@ class Keypad (threading.Thread):
         # Shutdown Key
         elif(key=='C'): self._KeyFunctionC()
 
+    ############################################################################
+    # Function
+    ############################################################################
+    def Stop(self):
+        self._keepRunning = False
+
 
     ############################################################################
     # Function
@@ -179,10 +196,10 @@ class Keypad (threading.Thread):
         self._SetupGPIOPins()
 
         # Setup the authentication
-        self.auth = Authentication(self._pepper, self._dbPath)
+        self.auth = Authentication()
 
         # Run the keypad loop
-        while(self.keepRunning):
+        while(self._keepRunning):
             time.sleep(1)
 
             # Read key
@@ -190,3 +207,5 @@ class Keypad (threading.Thread):
 
             # Process the recceived key
             if(key is not None): self._ProcessKey(key)
+
+        logging.debug("Keypad has stopped.")

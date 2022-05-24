@@ -24,9 +24,11 @@ class Buzzer:
     ############################################################################
     # Function
     ############################################################################
-    def Beep(self, longBeep=False) -> None:
-        delay = 1 if(longBeep) else 0.05
-        GPIO.output(self._pin,GPIO.HIGH)
-        time.sleep(delay)
-        GPIO.output(self._pin,GPIO.LOW)
-        logging.debug("Beep")
+    def Beep(self, longBeep=False, noOfBeeps=1) -> None:
+        for i in range(0, noOfBeeps):
+            delay = 1 if(longBeep) else 0.05
+            GPIO.output(self._pin,GPIO.HIGH)
+            time.sleep(delay)
+            GPIO.output(self._pin,GPIO.LOW)
+            logging.debug("Beep")
+            time.sleep(0.1)

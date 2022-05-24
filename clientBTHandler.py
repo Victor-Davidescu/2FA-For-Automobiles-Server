@@ -6,6 +6,8 @@ import bluetooth
 import threading
 import queue
 import logging
+from led import Led
+from config import Configurations
 from authentication import Authentication
 
 ################################################################################
@@ -14,20 +16,31 @@ from authentication import Authentication
 class ClientBTHandler (threading.Thread):
 
     ############################################################################
-    # Function
+    # Constructor
     ############################################################################
-    def __init__(self, port:int, pepper, dbPath) -> None:
+    def __init__(self) -> None:
         threading.Thread.__init__(self)
+
+        # Get neccessary configurations
+        config = Configurations()
+        self._port = config.GetInt('bluetooth','port')
+        btLedPin = config.GetInt('gpio_pins','led_bluetooth_pin')
+
+        # Declare the BT LED
+        self.led = Led(btLedPin)
+
+        # Declare the sockets
         self._serverSocket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self._serverSocket.settimeout(10)
+        self._serverSocket.settimeout(10) # Set timeout for waiting connection
         self._clientSocket = None
+
+        # Declare variables related to the client
         self._clientAddress = None
-        self._port = port
-        self.clientConnected = False
         self._clientAuthenticated = False
-        self._pepper = pepper
-        self._dbPath = dbPath
-        self.keepRunning = True
+        self.clientConnected = False
+
+        # Declare other variables
+        self._keepRunning = True
         self.cmdQueue = queue.Queue()
 
 
@@ -146,7 +159,7 @@ class ClientBTHandler (threading.Thread):
 
         elif(data == "shutdown"):
             if(self._clientAuthenticated):
-                self.keepRunning = False
+                self._keepRunning = False
                 self.cmdQueue.put(data)
                 self._SendData("2FA is shutting down.")
             else: self._SendData("You need to authenticate first. Use 'login' command.")
@@ -183,34 +196,41 @@ class ClientBTHandler (threading.Thread):
 
 
     ############################################################################
+    # Function
+    ############################################################################
+    def Stop(self):
+        logging.debug("BT Handler received stop command")
+        self._keepRunning = False
+        self.led.Stop() # Stop the led thread
+        self.led.join() # Wait for thread to join
+
+
+    ############################################################################
     # Main Thread Function
     ############################################################################
     def run(self) -> None:
-
-        # Bind to a port and listen
-        self._BindToPort()
-        self._StartListening()
+        self._BindToPort() # Bind the server socket to a port
+        self._StartListening() # Make the server socket listen to connections
+        self.led.start() # Start the thread for BT led indicator
 
         # Initiate authentication class and delete pepper and path to DB
-        self.auth = Authentication(self._pepper, self._dbPath)
-        del self._pepper
-        del self._dbPath
+        self.auth = Authentication()
 
         # Start the main thread loop
-        while(self.keepRunning):
+        while(self._keepRunning):
 
             # Check if a client is connected
             if(not self.clientConnected):
-                # If client is not connected, wait to connect back
-                self._WaitClientConnection()
-
+                self.led.Blink()
+                self._WaitClientConnection() # If client is not connected, wait to connect back
+                self.led.ON()
             else:
                 # Wait for the client to send data
                 data = self._ReceiveData()
-
                 # Process the data received from client
                 self._ProcessInputData(data)
 
-        # Close sockets
-        self._CloseClientSocket()
-        self._CloseServerSocket()
+
+        self._CloseClientSocket() # Close client socket
+        self._CloseServerSocket() # Close server socket
+        logging.debug("BT Handler has stopped.")

@@ -2,7 +2,6 @@
 # Author: Victor Davidescu
 # SID: 1705734
 ################################################################################
-import third_party_drivers.I2C_LCD_driver as LCDDriver
 import RPi.GPIO as GPIO
 import time
 import logging
@@ -10,6 +9,7 @@ from config import Configurations
 from keypad import Keypad
 from relay import RelaySwitch
 from clientBTHandler import ClientBTHandler
+from led import Led
 
 
 ################################################################################
@@ -18,50 +18,41 @@ from clientBTHandler import ClientBTHandler
 class Main:
 
     ############################################################################
-    # Function 
+    # Constructor
     ############################################################################
     def __init__(self):
-
-        # Setup GPIO to use Broadcom uses the actual pin number
+        # Setup the GPIO
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
+
+        # Get required configurations
+        config = Configurations()
+        relayPin = config.GetInt('gpio_pins','relay_pin')
+        ledPowerPin = config.GetInt('gpio_pins','led_power_pin')
+
+        # Declare instances
+        self.ledPower = Led(ledPowerPin)
+        self.relaySwitch = RelaySwitch(relayPin)
+        self.mainBT = ClientBTHandler()
+        self.mainKepad = Keypad()
+
+        # Declare other variables
         self.keepRunning = True
-
-        self.config = Configurations("config.conf")
-        self.mainBT = ClientBTHandler(
-            int(self.config.bluetoothPin),
-            self.config.pepper, 
-            self.config.dbLocation)
-
-        self.mainRelay = RelaySwitch(self.config.relayPin)
-        self.mainLCD = LCDDriver.lcd()
-        self.mainKepad = Keypad(
-            self.config.rowLength, 
-            self.config.columnLength, 
-            self.config.keypadRowPins,
-            self.config.keypadColumnPins,
-            self.config.keys,
-            self.config.defaultUser,
-            self.config.pepper, 
-            self.config.dbLocation)
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def ProcessCMD(self, cmd:str):
         # Switch ON/OFF the relay
         if(cmd == "switch"):
-            if(self.mainRelay.Status()): self.mainRelay.OFF()
-            else: self.mainRelay.ON()
+            if(self.relaySwitch.Status()): self.relaySwitch.OFF()
+            else: self.relaySwitch.ON()
 
         # Shutdown program
         elif(cmd == "shutdown"):
-
             if(not self.mainBT.clientConnected):
-                self.keepRunning = False
-                self.mainBT.keepRunning = False
-                self.mainKepad.keepRunning = False
+                self.Stop()
             else:
                 logging.error("Cannot shutdown, because there is an active BT connection.")
 
@@ -69,7 +60,7 @@ class Main:
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def CheckCMDQueue(self, queueFromBT:bool):
         cmd = None
@@ -87,19 +78,27 @@ class Main:
 
 
     ############################################################################
-    # Function 
+    # Function
+    ############################################################################
+    def Stop(self):
+        self.keepRunning = False
+        self.mainBT.Stop()
+        self.mainBT.join()
+        self.mainKepad.Stop()
+        self.mainKepad.join()
+        self.ledPower.Stop()
+        self.ledPower.join()
+
+
+    ############################################################################
+    # Function
     ############################################################################
     def Main(self):
-
-        # Making sure the relay stays locked at the beginning of the program
-        self.mainRelay.OFF()
-
-        # Display a message on LCD
-        #self.mainLCD.lcd_display_string("2FA Running", 1)
-
-        # Start a separate thread for BT and keypad communication
-        self.mainBT.start()
-        self.mainKepad.start()
+        self.relaySwitch.OFF() # Turn off (lock) the relay switch
+        self.ledPower.start() # Start the thread for power led
+        self.ledPower.ON() # Turn on the power led
+        self.mainBT.start() # Start thread for bluetooth connection
+        self.mainKepad.start() # Start thread for keypad
 
         # Start main loop
         while(self.keepRunning):
@@ -115,12 +114,7 @@ class Main:
             if(cmd is not None):
                 self.ProcessCMD(cmd)
 
-        # Once the bt thread ends it will rejoin here
-        self.mainBT.join()
-        self.mainKepad.join()
-
-        # Clean the GPIO and the LCD screen
-        #self.mainLCD.lcd_clear()
+        # Clean the GPIO
         GPIO.cleanup()
 
 

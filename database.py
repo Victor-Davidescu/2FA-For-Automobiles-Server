@@ -4,6 +4,7 @@
 ################################################################################
 import sqlite3
 import logging
+from config import Configurations
 
 ################################################################################
 # Class Database
@@ -11,17 +12,22 @@ import logging
 class Database:
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
-    def __init__(self, dbLocation) -> None:
+    def __init__(self) -> None:
+
+        # Get neccessary configurations
+        self.config = Configurations()
+        self.pathToDB = self.config.GetString('database','location')
+        del self.config
+
         self.connection = None
-        self.pathToDB = dbLocation
         self.connectedToDB = False
         self.usersTableName = "USERS"
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def ConnectToDB(self) -> bool:
         try:
@@ -29,17 +35,17 @@ class Database:
         except Exception as err:
             logging.error(err)
             return False
-        else: 
+        else:
             logging.info("Connected successfully to the DB.")
             self.connectedToDB = True
             return True
 
-    
+
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _DeleteTable(self, tableName:str) -> None:
-        try: self.connection.execute("DROP TABLE {0}".format(tableName))         
+        try: self.connection.execute("DROP TABLE {0}".format(tableName))
         except Exception as err: logging.error(err)
         else:
             self.connection.commit()
@@ -47,7 +53,7 @@ class Database:
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _CreateUsersTable(self) -> None:
         try:
@@ -64,19 +70,19 @@ class Database:
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def ResetUsersTable(self):
         # Check if there is a connection to DB.
         if(self.connectedToDB):
             self._DeleteTable(self.usersTableName)
             self._CreateUsersTable()
-        else: 
+        else:
             logging.error("There is no connection made to DB, reset for user's table is aborted.")
 
-    
+
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def _GetNewUserID(self) -> int:
         records = self.GetDetailsFromAllUsers()
@@ -84,7 +90,7 @@ class Database:
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def InsertUserInDB(self, name:str, salt:str, hash:str) -> bool:
         # Check if there is a connection to DB
@@ -92,7 +98,7 @@ class Database:
             userID = self._GetNewUserID()
             sqlQuery = "INSERT INTO {0} (ID,NAME,SALT,HASH) VALUES ({1},'{2}','{3}','{4}');".format(self.usersTableName,userID,name,salt,hash)
             try: self.connection.execute(sqlQuery)
-            except Exception as err: 
+            except Exception as err:
                 logging.error(err)
                 return False
             else:
@@ -103,7 +109,7 @@ class Database:
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def GetSaltAndHashFromUser(self, name:str):
         # Check if there is a connection to DB
@@ -112,7 +118,7 @@ class Database:
             saltValue = None
             hashValue = None
 
-            try: 
+            try:
                 cursor = self.connection.execute(sqlQuery)
                 for row in cursor:
                     saltValue = row[2]
@@ -122,35 +128,35 @@ class Database:
             except Exception as err: logging.error(err)
             return (saltValue, hashValue)
 
-        else: 
+        else:
             logging.error("There is no connection made to DB, could not get salt and hash values.")
             return (None,None)
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def GetDetailsFromAllUsers(self) -> list:
         # Check if there is a connection to DB
         if(self.connectedToDB):
             records = []
 
-            try: 
+            try:
                 cursor = self.connection.execute("SELECT * FROM USERS")
                 for row in cursor:
                     records.append(row)
-            except Exception as err: 
+            except Exception as err:
                 logging.error(err)
                 return None
-            else: 
+            else:
                 return records
-        else: 
+        else:
             logging.error("There is no connection made to DB, reset for user's table is aborted.")
             return None
 
 
     ############################################################################
-    # Function 
+    # Function
     ############################################################################
     def CloseConnectionToDB(self):
         # Check if there is a connection to DB
