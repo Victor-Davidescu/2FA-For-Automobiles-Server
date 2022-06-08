@@ -17,9 +17,7 @@ class Database:
     def __init__(self) -> None:
 
         # Get neccessary configurations
-        self.config = Configurations()
-        self.pathToDB = self.config.GetString('database','location')
-        del self.config
+        self.pathToDB = Configurations.GetString('database','location')
 
         self.connection = None
         self.connectedToDB = False

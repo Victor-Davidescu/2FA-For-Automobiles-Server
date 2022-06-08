@@ -15,9 +15,7 @@ class Authentication():
     def __init__(self) -> None:
 
         # Get neccessary configurations
-        self.config = Configurations()
-        self.pepper = self.config.GetString('hash','pepper_value')
-        del self.config
+        self.pepper = Configurations.GetString('hash','pepper_value')
 
         # Establish a connection to DB
         self.database = Database()

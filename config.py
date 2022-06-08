@@ -13,24 +13,27 @@ CONFIG_FILE_PATH = "config.conf"
 ################################################################################
 class Configurations:
 
+
     ############################################################################
-    # Class Constructor
+    # Function
     ############################################################################
-    def __init__(self) -> None:
-        self.config = ConfigParser()
-        try: self.config.read(CONFIG_FILE_PATH)
+    def _GetDataFromConfigFile(category:str, name:str) -> str:
+        config = ConfigParser()
+        try:
+            config.read(CONFIG_FILE_PATH)
+            data = config.get(category, name)
         except Exception as err:
-            logging.critical("Could not read the configuration file. Details: {0}".format(err))
             sys.exit(err)
         else:
-            logging.debug("Configuration file read successfully")
+            return data
 
 
     ############################################################################
     # Function
     ############################################################################
-    def GetString(self, category:str, name:str) -> str:
-        try: data = self.config.get(category, name)
+    def GetString(category:str, name:str) -> str:
+        try: data = Configurations._GetDataFromConfigFile(category,name)
+
         except Exception as err:
             logging.error("Could not read data located at [{0}] {1}. Details: {2}".format(category, name, err))
             return None
@@ -42,19 +45,19 @@ class Configurations:
     ############################################################################
     # Function
     ############################################################################
-    def GetInt(self, category:str, name:str) -> int:
-        try: data = self.config.getint(category, name)
+    def GetInt(category:str, name:str) -> int:
+        try: data = Configurations._GetDataFromConfigFile(category,name)
         except Exception as err:
             logging.error("Could not read data located at [{0}] {1}. Details: {2}".format(category, name, err))
             return None
-        else: return data
+        else: return int(data)
 
 
     ############################################################################
     # Function
     ############################################################################
-    def GetIntList(self, category:str, name:str) -> list:
-        data = self.GetString(category, name)
+    def GetIntList(category:str, name:str) -> list:
+        data = Configurations.GetString(category, name)
         if(data is not None):
             data = data.split(',')
             for i in range(0, len(data)):
@@ -66,8 +69,8 @@ class Configurations:
     ############################################################################
     # Function
     ############################################################################
-    def GetKeypadKeysList(self, category:str, name:str) -> list:
-        keysString = self.GetString(category, name)
+    def GetKeypadKeysList(category:str, name:str) -> list:
+        keysString = Configurations.GetString(category, name)
         keysList = []
         if(keysString is not None):
             for rowKeys in keysString.split('|'):

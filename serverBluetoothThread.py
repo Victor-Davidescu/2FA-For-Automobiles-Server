@@ -6,6 +6,7 @@ import bluetooth
 import threading
 import queue
 import logging
+import re
 from led import Led
 from config import Configurations
 from authentication import Authentication
@@ -13,7 +14,7 @@ from authentication import Authentication
 ################################################################################
 # Class Bluetooth handler
 ################################################################################
-class ClientBTHandler (threading.Thread):
+class ServerBluetoothThread (threading.Thread):
 
     ############################################################################
     # Constructor
@@ -22,16 +23,17 @@ class ClientBTHandler (threading.Thread):
         threading.Thread.__init__(self)
 
         # Get neccessary configurations
-        config = Configurations()
-        self._port = config.GetInt('bluetooth','port')
-        btLedPin = config.GetInt('gpio_pins','led_bluetooth_pin')
+        self._port = Configurations.GetInt('bluetooth', 'port')
+        socketTimeout = Configurations.GetInt('bluetooth', 'socket_timeout_seconds')
+        self._maxLoginAttempts = Configurations.GetInt('bluetooth', 'max_login_attempts')
+        btLedPin = Configurations.GetInt('gpio_pins', 'led_bluetooth_pin')
 
         # Declare the BT LED
         self.led = Led(btLedPin)
 
         # Declare the sockets
         self._serverSocket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self._serverSocket.settimeout(10) # Set timeout for waiting connection
+        self._serverSocket.settimeout(socketTimeout) # Set timeout for waiting connection
         self._clientSocket = None
 
         # Declare variables related to the client
@@ -83,7 +85,7 @@ class ClientBTHandler (threading.Thread):
     ############################################################################
     # Function
     ############################################################################
-    def _ReceiveData(self) -> None:
+    def _ReceiveData(self) -> str:
 
         try: dataBytes = self._clientSocket.recv(1024)
         except Exception as error:
@@ -118,28 +120,33 @@ class ClientBTHandler (threading.Thread):
     # Function
     ############################################################################
     def _AuthenticateClient(self):
+
         if(not self._clientAuthenticated):
-            self._SendData("Enter your username:")
-            username = self._ReceiveData()
+            self._SendData("enter user and pin")
 
-            # Allow maximum 3 attempts for the pin
-            for attempt in range(3,0,-1):
-                self._SendData("Enter your pin:")
-                pin = self._ReceiveData()
+            # Loop for the maximum login attempts
+            for attempt in range(self._maxLoginAttempts, 0, -1):
+                msg = self._ReceiveData() # msg should look like "username,pin"
 
-                # Check if username and pin match
-                if(self.auth.CheckUserPin(username,pin)):
-                    self._clientAuthenticated = True
-                    self._SendData("Authenticated successfully.\n")
-                    break
-                else: self._SendData("Wrong pin, you have {0} attempts left.\n".format(attempt-1))
+                # User regex to find group 1 (username) and group 2 (pin)
+                result = re.match(r"([a-zA-Z]+),([0-9]+)",msg)
+                if (result):
+                    username = result.group(1)
+                    pin = result.group(2)
+
+                    # Check if username and pin match
+                    if(self.auth.CheckUserPin(username,pin)):
+                        self._clientAuthenticated = True
+                        self._SendData("logged in")
+                        break
+                    else: self._SendData("wrong credentials")
+                else: self._SendData("wrong format")
 
             # Check if the client is authenticated, if not close the connection
             if(not self._clientAuthenticated):
-                self._SendData("Too many failed attempts, disconnecting.\n")
                 self._CloseClientSocket()
 
-        else: self._SendData("You are already logged in.\n")
+        else: self._SendData("already logged in")
 
 
     ############################################################################
@@ -155,20 +162,20 @@ class ClientBTHandler (threading.Thread):
 
         elif(data == "logout"):
             self._clientAuthenticated = False
-            self._SendData("You logged out.")
+            self._SendData("logged out")
 
         elif(data == "shutdown"):
             if(self._clientAuthenticated):
                 self._keepRunning = False
                 self.cmdQueue.put(data)
-                self._SendData("2FA is shutting down.")
-            else: self._SendData("You need to authenticate first. Use 'login' command.")
+                self._SendData("shutting down")
+            else: self._SendData("unauthorised command")
 
         else:
             if(self._clientAuthenticated):
                 self.cmdQueue.put(data)
-                self._SendData("Command '{0}' received.".format(data))
-            else: self._SendData("You need to authenticate first. Use 'login' command.")
+                self._SendData("command '{0}' received".format(data))
+            else: self._SendData("unauthorised command")
 
     ############################################################################
     # Function

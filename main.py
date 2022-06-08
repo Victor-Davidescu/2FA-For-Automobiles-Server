@@ -8,7 +8,7 @@ import logging
 from config import Configurations
 from keypad import Keypad
 from relay import RelaySwitch
-from clientBTHandler import ClientBTHandler
+from serverBluetoothThread import ServerBluetoothThread
 from led import Led
 
 
@@ -26,14 +26,13 @@ class Main:
         GPIO.setwarnings(False)
 
         # Get required configurations
-        config = Configurations()
-        relayPin = config.GetInt('gpio_pins','relay_pin')
-        ledPowerPin = config.GetInt('gpio_pins','led_power_pin')
+        relayPin = Configurations.GetInt('gpio_pins','relay_pin')
+        ledPowerPin = Configurations.GetInt('gpio_pins','led_power_pin')
 
         # Declare instances
         self.ledPower = Led(ledPowerPin)
         self.relaySwitch = RelaySwitch(relayPin)
-        self.mainBT = ClientBTHandler()
+        self.mainBT = ServerBluetoothThread()
         self.mainKepad = Keypad()
 
         # Declare other variables

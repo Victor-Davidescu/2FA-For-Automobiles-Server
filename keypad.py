@@ -28,15 +28,14 @@ class Keypad (threading.Thread):
         threading.Thread.__init__(self)
 
         # Get necessary configurations
-        config = Configurations()
-        self._rowLength = config.GetInt('keypad','row_length')
-        self._columnLength = config.GetInt('keypad','column_length')
-        self._rowPins = config.GetIntList('gpio_pins','keypad_row_pins')
-        self._columnPins = config.GetIntList('gpio_pins','keypad_column_pins')
-        self._keys = config.GetKeypadKeysList('keypad','keys')
-        self._defaultUser = config.GetString('keypad','default_user')
-        buzzerPin = config.GetInt('gpio_pins','buzzer_pin')
-        self.keypadLockTime = config.GetInt('keypad','keypad_lock_time_seconds')
+        self._rowLength = Configurations.GetInt('keypad','row_length')
+        self._columnLength = Configurations.GetInt('keypad','column_length')
+        self._rowPins = Configurations.GetIntList('gpio_pins','keypad_row_pins')
+        self._columnPins = Configurations.GetIntList('gpio_pins','keypad_column_pins')
+        self._keys = Configurations.GetKeypadKeysList('keypad','keys')
+        self._defaultUser = Configurations.GetString('keypad','default_user')
+        buzzerPin = Configurations.GetInt('gpio_pins','buzzer_pin')
+        self.keypadLockTime = Configurations.GetInt('keypad','keypad_lock_time_seconds')
 
         # Declare instances
         self.lcd = LCD()
