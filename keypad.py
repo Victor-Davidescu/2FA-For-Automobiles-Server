@@ -36,13 +36,14 @@ class Keypad (threading.Thread):
         self._defaultUser = Configurations.GetString('keypad','default_user')
         buzzerPin = Configurations.GetInt('gpio_pins','buzzer_pin')
         self.keypadLockTime = Configurations.GetInt('keypad','keypad_lock_time_seconds')
+        self._loginMaxAttempts = Configurations.GetInt('keypad','max_login_attempts')
 
         # Declare instances
         self.lcd = LCD()
         self.buzzer = Buzzer(buzzerPin)
 
         # Declare other variables
-        self._loginAttempts = 3
+        self._currentLoginAttempts = 0
         self._userAuthenticated = False
         self._keepRunning = True
         self.cmdQueue = queue.Queue()
@@ -125,6 +126,7 @@ class Keypad (threading.Thread):
 
             # Check if user confirmed pin
             if(pinConfirmed):
+                self._currentLoginAttempts += 1
                 # Check if the pin received is correct
                 if(self.auth.CheckUserPin(self._defaultUser, pin)):
                     logging.debug("Authentication is successful.")
@@ -137,15 +139,15 @@ class Keypad (threading.Thread):
                     self.lcd.lcd_clear()
 
                     # Check if there are any login attempts left
-                    if(self._loginAttempts == 0):
+                    if(self._loginMaxAttempts == self._currentLoginAttempts):
                         self.lcd.lcd_display_string("Keypad is locked for",1)
                         self.lcd.lcd_display_string("{0} seconds".format(self.keypadLockTime),2)
                         time.sleep(self.keypadLockTime)
                     else:
                         self.lcd.lcd_display_string("Wrong PIN",1)
-                        self.lcd.lcd_display_string("{0} tries left.".format(self._loginAttempts),2)
+                        self.lcd.lcd_display_string("{0} tries left.".format(self._loginMaxAttempts-self._currentLoginAttempts),2)
                         self.buzzer.Beep(longBeep=True)
-                        self._loginAttempts -= 1
+
             else:
                 logging.debug("Keypad: Authentication is cancelled")
                 self.lcd.lcd_clear()
