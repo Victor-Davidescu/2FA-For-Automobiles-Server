@@ -44,6 +44,7 @@ class ServerBluetoothThread (threading.Thread):
         # Declare other variables
         self._keepRunning = True
         self.cmdQueue = queue.Queue()
+        self._currentAttempts = 0
 
 
     ############################################################################
@@ -119,63 +120,70 @@ class ServerBluetoothThread (threading.Thread):
     ############################################################################
     # Function
     ############################################################################
-    def _AuthenticateClient(self):
-
+    def _AuthenticateClient(self, msg:str):
+        # Check if user is already authenticated
         if(not self._clientAuthenticated):
-            self._SendData("enter user and pin")
+            self._currentAttempts += 1
 
-            # Loop for the maximum login attempts
-            for attempt in range(self._maxLoginAttempts, 0, -1):
-                msg = self._ReceiveData() # msg should look like "username,pin"
+            # User regex to find group 1 (username) and group 2 (pin)
+            result = re.match(r"login-([a-zA-Z]+),([0-9]+)",msg)
 
-                # User regex to find group 1 (username) and group 2 (pin)
-                result = re.match(r"([a-zA-Z]+),([0-9]+)",msg)
-                if (result):
+            # Check if the right format
+            if (result):
+
                     username = result.group(1)
                     pin = result.group(2)
 
                     # Check if username and pin match
                     if(self.auth.CheckUserPin(username,pin)):
                         self._clientAuthenticated = True
+                        self._currentAttempts = 0
                         self._SendData("logged in")
-                        break
-                    else: self._SendData("wrong credentials")
-                else: self._SendData("wrong format")
 
-            # Check if the client is authenticated, if not close the connection
-            if(not self._clientAuthenticated):
-                self._CloseClientSocket()
-
-        else: self._SendData("already logged in")
+                    else:
+                        if(self._currentAttempts < self._maxLoginAttempts):
+                            self._SendData("wrong credentials")
+                        else:
+                            self._currentAttempts = 0
+                            self._CloseClientSocket()
+            else:
+                if(self._currentAttempts < self._maxLoginAttempts):
+                    self._SendData("wrong format")
+                else:
+                    self._currentAttempts = 0
+                    self._CloseClientSocket()
+        else:
+            self._SendData("already logged in")
 
 
     ############################################################################
     # Function
     ############################################################################
-    def _ProcessInputData(self, data):
+    def _ProcessInputData(self, data:str=None):
 
-        if(data == "disconnect"):
-            self._CloseClientSocket()
+        if(data is not None):
+            if(data == "disconnect"):
+                self._CloseClientSocket()
 
-        elif(data == "login"):
-            self._AuthenticateClient()
+            elif(data.startswith("login")):
+                self._AuthenticateClient(data)
 
-        elif(data == "logout"):
-            self._clientAuthenticated = False
-            self._SendData("logged out")
+            elif(data == "logout"):
+                self._clientAuthenticated = False
+                self._SendData("logged out")
 
-        elif(data == "shutdown"):
-            if(self._clientAuthenticated):
-                self._keepRunning = False
-                self.cmdQueue.put(data)
-                self._SendData("shutting down")
-            else: self._SendData("unauthorised command")
+            elif(data == "shutdown"):
+                if(self._clientAuthenticated):
+                    self._keepRunning = False
+                    self.cmdQueue.put(data)
+                    self._SendData("shutting down")
+                else: self._SendData("unauthorised command")
 
-        else:
-            if(self._clientAuthenticated):
-                self.cmdQueue.put(data)
-                self._SendData("command '{0}' received".format(data))
-            else: self._SendData("unauthorised command")
+            else:
+                if(self._clientAuthenticated):
+                    self.cmdQueue.put(data)
+                    self._SendData("command '{0}' received".format(data))
+                else: self._SendData("unauthorised command")
 
     ############################################################################
     # Function
