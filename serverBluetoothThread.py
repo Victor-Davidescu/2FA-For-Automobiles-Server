@@ -10,6 +10,7 @@ import re
 from led import Led
 from config import Configurations
 from authentication import Authentication
+from encryption import Encryption
 
 ################################################################################
 # Class Bluetooth handler
@@ -86,34 +87,36 @@ class ServerBluetoothThread (threading.Thread):
     ############################################################################
     # Function
     ############################################################################
-    def _ReceiveData(self) -> str:
+    def _ReceiveMsg(self) -> str:
 
-        try: dataBytes = self._clientSocket.recv(1024)
+        try: encryptedMsgBytes:bytes = self._clientSocket.recv(1024)
         except Exception as error:
             logging.error("Failed to retreive message. Details: {0}".format(error))
             self._CloseClientSocket()
         else:
-            data = dataBytes.decode('utf-8').rstrip()
-            return data
+            encryptedMsg = encryptedMsgBytes.decode("UTF-8") # this msg can be either encrypted or not
+            msg = Encryption.DecryptMessage(encryptedMsg)
+            if(msg is not None): return msg
+            else: return None
 
 
     ############################################################################
     # Function
     ############################################################################
-    def _SendData(self, data:str) -> None:
-        # Check if data is empty
-        if(data is not None):
+    def _SendMessage(self, msg:str) -> None:
+        if(msg is not None):
+            if(msg.endswith("\n")): msg = msg.replace("\n","") # Remove the newline
+            encryptedMsg = Encryption.EncryptMessage(msg) # Encrypt msg
 
-            # Add end of line if data does't have it
-            if(not data.endswith("\n")): data = data + "\n"
-
-            # Send Data
-            try: self._clientSocket.send(data.encode())
-            except Exception as error:
-                logging.error("Failed to send message. Details: {0}".format(error))
-                self._CloseClientSocket()
-            else: logging.debug("Message sent successfully.")
-
+            if(encryptedMsg is not None): # If encryption failed, don't send any message
+                encryptedMsg += "\n" # Add new line for the crypted msg
+                encryptedMsgBytes = encryptedMsg.encode() # Convert to bytes
+                try: self._clientSocket.send(encryptedMsgBytes)
+                except Exception as error:
+                    logging.error("Failed to send message. Details: {0}".format(error))
+                    self._CloseClientSocket()
+                else: logging.debug("Message sent successfully.")
+                
         else: logging.error("The data received for sending is empty.")
 
 
@@ -138,22 +141,22 @@ class ServerBluetoothThread (threading.Thread):
                     if(self.auth.CheckUserPin(username,pin)):
                         self._clientAuthenticated = True
                         self._currentAttempts = 0
-                        self._SendData("logged in")
+                        self._SendMessage("logged in")
 
                     else:
                         if(self._currentAttempts < self._maxLoginAttempts):
-                            self._SendData("wrong credentials")
+                            self._SendMessage("wrong credentials")
                         else:
                             self._currentAttempts = 0
                             self._CloseClientSocket()
             else:
                 if(self._currentAttempts < self._maxLoginAttempts):
-                    self._SendData("wrong format")
+                    self._SendMessage("wrong format")
                 else:
                     self._currentAttempts = 0
                     self._CloseClientSocket()
         else:
-            self._SendData("already logged in")
+            self._SendMessage("already logged in")
 
 
     ############################################################################
@@ -170,20 +173,20 @@ class ServerBluetoothThread (threading.Thread):
 
             elif(data == "logout"):
                 self._clientAuthenticated = False
-                self._SendData("logged out")
+                self._SendMessage("logged out")
 
             elif(data == "shutdown"):
                 if(self._clientAuthenticated):
                     self._keepRunning = False
                     self.cmdQueue.put(data)
-                    self._SendData("shutting down")
-                else: self._SendData("unauthorised command")
+                    self._SendMessage("shutting down")
+                else: self._SendMessage("unauthorised command")
 
             else:
                 if(self._clientAuthenticated):
                     self.cmdQueue.put(data)
-                    self._SendData("command '{0}' received".format(data))
-                else: self._SendData("unauthorised command")
+                    self._SendMessage("command '{0}' received".format(data))
+                else: self._SendMessage("unauthorised command")
 
     ############################################################################
     # Function
@@ -241,7 +244,7 @@ class ServerBluetoothThread (threading.Thread):
                 self.led.ON()
             else:
                 # Wait for the client to send data
-                data = self._ReceiveData()
+                data = self._ReceiveMsg()
                 # Process the data received from client
                 self._ProcessInputData(data)
 

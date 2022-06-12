@@ -1,0 +1,52 @@
+################################################################################
+# Author: Victor Davidescu
+# SID: 1705734
+################################################################################
+from config import Configurations
+from Crypto.Cipher import AES
+import base64
+import os
+import logging
+
+BLOCK_SIZE = 16
+
+class Encryption:
+
+    def _GetKey() -> bytes:
+        key = Configurations.GetString("security","key")
+        return key.encode("UTF-8")
+
+    def _Pad(byteArray:bytes) -> bytes:
+        padLength = BLOCK_SIZE - len(byteArray) % BLOCK_SIZE
+        return byteArray + (bytes([padLength]) * padLength)
+
+    def _Unpad(byteArray:bytes) -> bytes:
+        last_byte = byteArray[-1]
+        return byteArray[0:-last_byte]
+
+    def EncryptMessage(msg:str) -> str:
+        try:
+            byteArray = msg.encode("UTF-8")
+            padded = Encryption._Pad(byteArray)
+            initVector = os.urandom(AES.block_size)
+            cipher = AES.new(Encryption._GetKey(), AES.MODE_CBC, initVector )
+            encrypted = cipher.encrypt(padded)
+            return base64.b64encode(initVector+encrypted).decode("UTF-8")
+
+        except Exception as err:
+            logging.error("Failed to encrypt message. {0}".format(err))
+            return None
+
+    def DecryptMessage(msg:str) -> str:
+        try:
+            byteArray = base64.b64decode(msg)
+            initVector = byteArray[0:16]
+            msgBytes = byteArray[16:]
+            cipher = AES.new(Encryption._GetKey(), AES.MODE_CBC, initVector)
+            decryptedPad = cipher.decrypt(msgBytes)
+            decrypted = Encryption._Unpad(decryptedPad)
+            return decrypted.decode("UTF-8")
+
+        except Exception as err:
+            logging.error("Failed to encrypt message. {0}".format(err))
+            return None
