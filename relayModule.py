@@ -8,7 +8,7 @@ import logging
 
 class RelayModule:
 
-    def __init__(self, pin:int):
+    def __init__(self, pin:int) -> None:
         self.pin = pin
         GPIO.setup(self.pin, GPIO.OUT)
 
