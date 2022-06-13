@@ -10,10 +10,9 @@ from database import Database
 class Authentication():
 
     ############################################################################
-    # Function
+    # Class Constructor
     ############################################################################
     def __init__(self) -> None:
-
         # Get neccessary configurations
         self.pepper = Configurations.GetString('hash','pepper_value')
 
@@ -26,7 +25,6 @@ class Authentication():
     # Function
     ############################################################################
     def AddUserInDB(self, name, pin):
-
         # Generate random salt value
         salt = secrets.token_hex(32)
 
@@ -41,7 +39,6 @@ class Authentication():
     # Function
     ############################################################################
     def CheckUserPin(self, name, pin) -> bool:
-
         # Obtain salt and hashed pin from database
         (saltFromDB, pinHashedFromDB) = self.database.GetSaltAndHashFromUser(name)
 
