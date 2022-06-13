@@ -7,7 +7,7 @@ import time
 import logging
 from config import Configurations
 from keypad import Keypad
-from relay_module import RelayModule
+from relayModule import RelayModule
 from serverBluetoothThread import ServerBluetoothThread
 from led import Led
 
