@@ -14,11 +14,11 @@ from led import Led
 
 ################################################################################
 # Class Main
-################################################################################
+################################################################################-
 class Main:
 
     ############################################################################
-    # Constructor
+    # Function
     ############################################################################
     def __init__(self):
         # Setup the GPIO
@@ -43,6 +43,8 @@ class Main:
     # Function
     ############################################################################
     def ProcessCMD(self, cmd:str):
+        """Process the received command."""
+
         # Switch ON/OFF the relay
         if(cmd == "switch"):
             if(self.relaySwitch.Status()): self.relaySwitch.OFF()
@@ -117,8 +119,14 @@ class Main:
         GPIO.cleanup()
 
 
-# Starting Point
+################################################################################
+#   STARTING POINT
+################################################################################
 if __name__ == "__main__":
-    logging.basicConfig(level="DEBUG")
+    logging.basicConfig(
+        level="DEBUG",
+        format="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%H:%M:%S")
+
     main = Main()
     main.Main()
