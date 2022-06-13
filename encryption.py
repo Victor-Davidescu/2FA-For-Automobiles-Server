@@ -10,8 +10,14 @@ import logging
 
 BLOCK_SIZE = 16
 
+################################################################################
+# Class Encryption
+################################################################################
 class Encryption:
 
+    ############################################################################
+    # Function
+    ############################################################################
     def _GetKey() -> bytes:
         keyFileLocation = Configurations.GetString("security","key_file_location")
 
@@ -24,17 +30,28 @@ class Encryption:
             logging.error(err)
             return None
 
-        else:
-            return key
+        else: return key
 
+
+    ############################################################################
+    # Function
+    ############################################################################
     def _Pad(byteArray:bytes) -> bytes:
         padLength = BLOCK_SIZE - len(byteArray) % BLOCK_SIZE
         return byteArray + (bytes([padLength]) * padLength)
 
+
+    ############################################################################
+    # Function
+    ############################################################################
     def _Unpad(byteArray:bytes) -> bytes:
         last_byte = byteArray[-1]
         return byteArray[0:-last_byte]
 
+
+    ############################################################################
+    # Function
+    ############################################################################
     def EncryptMessage(msg:str) -> str:
         try:
             byteArray = msg.encode("UTF-8")
@@ -48,6 +65,10 @@ class Encryption:
             logging.error("Failed to encrypt message. {0}".format(err))
             return None
 
+
+    ############################################################################
+    # Function
+    ############################################################################
     def DecryptMessage(msg:str) -> str:
         try:
             byteArray = base64.b64decode(msg)
