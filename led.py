@@ -8,8 +8,14 @@ import threading
 import logging
 
 
+################################################################################
+# Class Led
+################################################################################
 class Led (threading.Thread):
 
+    ############################################################################
+    # Class Constructor
+    ############################################################################
     def __init__(self, pin:int) -> None:
         threading.Thread.__init__(self)
         self._pin = pin
@@ -17,11 +23,17 @@ class Led (threading.Thread):
         self._delay = 0.6
         self._keepRunning = True
 
+    ############################################################################
+    # Functions
+    ############################################################################
     def ON(self) -> None: self._status = "ON"
     def OFF(self) -> None: self._status = "OFF"
     def Blink(self) -> None: self._status = "BLINK"
     def Stop(self) -> None: self._keepRunning = False
 
+    ############################################################################
+    # Thread Function
+    ############################################################################
     def run(self):
         GPIO.setup(self._pin, GPIO.OUT)
         GPIO.output(self._pin,GPIO.LOW)

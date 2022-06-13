@@ -12,10 +12,9 @@ from config import Configurations
 class Database:
 
     ############################################################################
-    # Function
+    # Class Constructor
     ############################################################################
     def __init__(self) -> None:
-
         # Get neccessary configurations
         self.pathToDB = Configurations.GetString('database','location')
 
@@ -94,7 +93,8 @@ class Database:
         # Check if there is a connection to DB
         if(self.connectedToDB):
             userID = self._GetNewUserID()
-            sqlQuery = "INSERT INTO {0} (ID,NAME,SALT,HASH) VALUES ({1},'{2}','{3}','{4}');".format(self.usersTableName,userID,name,salt,hash)
+            sqlQuery = "INSERT INTO {0} (ID,NAME,SALT,HASH) VALUES ({1},'{2}','{3}','{4}');".format(
+                self.usersTableName,userID,name,salt,hash)
             try: self.connection.execute(sqlQuery)
             except Exception as err:
                 logging.error(err)

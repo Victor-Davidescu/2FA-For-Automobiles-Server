@@ -12,7 +12,6 @@ from authentication import Authentication
 from config import Configurations
 from third_party_drivers.I2C_LCD_driver import lcd as LCD
 
-
 ################################################################################
 # Class Keypad
 ################################################################################

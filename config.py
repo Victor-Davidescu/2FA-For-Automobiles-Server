@@ -6,13 +6,11 @@ from configparser import ConfigParser
 import logging
 import sys
 
-CONFIG_FILE_PATH = "config.conf"
-
 ################################################################################
 # Class Configurations
 ################################################################################
 class Configurations:
-
+    CONFIG_FILE_PATH = "config.conf"
 
     ############################################################################
     # Function
@@ -20,7 +18,7 @@ class Configurations:
     def _GetDataFromConfigFile(category:str, name:str) -> str:
         config = ConfigParser()
         try:
-            config.read(CONFIG_FILE_PATH)
+            config.read(Configurations.CONFIG_FILE_PATH)
             data = config.get(category, name)
         except Exception as err:
             sys.exit(err)

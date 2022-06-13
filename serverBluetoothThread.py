@@ -18,7 +18,7 @@ from encryption import Encryption
 class ServerBluetoothThread (threading.Thread):
 
     ############################################################################
-    # Constructor
+    # Class Constructor
     ############################################################################
     def __init__(self) -> None:
         threading.Thread.__init__(self)
