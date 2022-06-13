@@ -1,6 +1,8 @@
 ################################################################################
 # Author: Victor Davidescu
 # SID: 1705734
+#
+# Code based on: https://github.com/ijl20/python_java_crypto
 ################################################################################
 from config import Configurations
 from Crypto.Cipher import AES
@@ -8,28 +10,26 @@ import base64
 import os
 import logging
 
-BLOCK_SIZE = 16
 
 ################################################################################
 # Class Encryption
 ################################################################################
 class Encryption:
+    BLOCK_SIZE = 16
 
     ############################################################################
-    # Function
+    # Class Constructor
     ############################################################################
     def _GetKey() -> bytes:
-        keyFileLocation = Configurations.GetString("security","key_file_location")
-
+        """Retreive encryption key from the key file"""
+        keyFileLocation = Configurations.GetString("security", "key_file_location")
         try:
             file = open(keyFileLocation,'rb')
             key:bytes = file.read()
             file.close()
-
         except Exception as err:
-            logging.error(err)
+            logging.error("Failed to retreive encryption key. Details: {0}".format(err))
             return None
-
         else: return key
 
 
@@ -37,7 +37,7 @@ class Encryption:
     # Function
     ############################################################################
     def _Pad(byteArray:bytes) -> bytes:
-        padLength = BLOCK_SIZE - len(byteArray) % BLOCK_SIZE
+        padLength = Encryption.BLOCK_SIZE - len(byteArray) % Encryption.BLOCK_SIZE
         return byteArray + (bytes([padLength]) * padLength)
 
 
@@ -60,7 +60,6 @@ class Encryption:
             cipher = AES.new(Encryption._GetKey(), AES.MODE_CBC, initVector )
             encrypted = cipher.encrypt(padded)
             return base64.b64encode(initVector+encrypted).decode("UTF-8")
-
         except Exception as err:
             logging.error("Failed to encrypt message. {0}".format(err))
             return None
@@ -78,7 +77,6 @@ class Encryption:
             decryptedPad = cipher.decrypt(msgBytes)
             decrypted = Encryption._Unpad(decryptedPad)
             return decrypted.decode("UTF-8")
-
         except Exception as err:
             logging.error("Failed to decrypt message. {0}".format(err))
             return None
