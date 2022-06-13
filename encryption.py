@@ -13,8 +13,19 @@ BLOCK_SIZE = 16
 class Encryption:
 
     def _GetKey() -> bytes:
-        key = Configurations.GetString("security","key")
-        return key.encode("UTF-8")
+        keyFileLocation = Configurations.GetString("security","key_file_location")
+
+        try:
+            file = open(keyFileLocation,'rb')
+            key:bytes = file.read()
+            file.close()
+
+        except Exception as err:
+            logging.error(err)
+            return None
+
+        else:
+            return key
 
     def _Pad(byteArray:bytes) -> bytes:
         padLength = BLOCK_SIZE - len(byteArray) % BLOCK_SIZE
