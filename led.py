@@ -8,14 +8,8 @@ import threading
 import logging
 
 
-################################################################################
-# Relay Switch
-################################################################################
 class Led (threading.Thread):
 
-    ############################################################################
-    # Constructor
-    ############################################################################
     def __init__(self, pin:int) -> None:
         threading.Thread.__init__(self)
         self._pin = pin
@@ -23,24 +17,15 @@ class Led (threading.Thread):
         self._delay = 0.6
         self._keepRunning = True
 
-
-    ############################################################################
-    # Functions
-    ############################################################################
     def ON(self) -> None: self._status = "ON"
     def OFF(self) -> None: self._status = "OFF"
     def Blink(self) -> None: self._status = "BLINK"
     def Stop(self) -> None: self._keepRunning = False
 
-
-    ############################################################################
-    # Function
-    ############################################################################
     def run(self):
-
-        # LED start
         GPIO.setup(self._pin, GPIO.OUT)
         GPIO.output(self._pin,GPIO.LOW)
+        logging.debug("LED has started.")
 
         # LED main loop
         while(self._keepRunning):
@@ -54,6 +39,5 @@ class Led (threading.Thread):
                     GPIO.output(self._pin,GPIO.LOW)
                     time.sleep(self._delay)
 
-        # LED end
         GPIO.output(self._pin,GPIO.LOW)
         logging.debug("LED has stopped.")
