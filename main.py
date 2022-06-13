@@ -7,7 +7,7 @@ import time
 import logging
 from config import Configurations
 from keypad import Keypad
-from relay import RelaySwitch
+from relay_module import RelayModule
 from serverBluetoothThread import ServerBluetoothThread
 from led import Led
 
@@ -31,7 +31,7 @@ class Main:
 
         # Declare instances
         self.ledPower = Led(ledPowerPin)
-        self.relaySwitch = RelaySwitch(relayPin)
+        self.relaySwitch = RelayModule(relayPin)
         self.mainBT = ServerBluetoothThread()
         self.mainKepad = Keypad()
 
@@ -47,8 +47,7 @@ class Main:
 
         # Switch ON/OFF the relay
         if(cmd == "switch"):
-            if(self.relaySwitch.Status()): self.relaySwitch.OFF()
-            else: self.relaySwitch.ON()
+            self.relaySwitch.Switch()
 
         # Shutdown program
         elif(cmd == "shutdown"):
@@ -95,7 +94,7 @@ class Main:
     # Function
     ############################################################################
     def Main(self):
-        self.relaySwitch.OFF() # Turn off (lock) the relay switch
+        self.relaySwitch.TurnOFF() # Turn off (lock) the relay switch
         self.ledPower.start() # Start the thread for power led
         self.ledPower.ON() # Turn on the power led
         self.mainBT.start() # Start thread for bluetooth connection
