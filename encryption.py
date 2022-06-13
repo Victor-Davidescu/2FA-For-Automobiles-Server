@@ -80,5 +80,5 @@ class Encryption:
             return decrypted.decode("UTF-8")
 
         except Exception as err:
-            logging.error("Failed to encrypt message. {0}".format(err))
+            logging.error("Failed to decrypt message. {0}".format(err))
             return None

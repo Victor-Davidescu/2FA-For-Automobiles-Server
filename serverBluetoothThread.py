@@ -28,6 +28,7 @@ class ServerBluetoothThread (threading.Thread):
         socketTimeout = Configurations.GetInt('bluetooth', 'socket_timeout_seconds')
         self._maxLoginAttempts = Configurations.GetInt('bluetooth', 'max_login_attempts')
         btLedPin = Configurations.GetInt('gpio_pins', 'led_bluetooth_pin')
+        self._maxStrangeInputDataAllowance = Configurations.GetInt('bluetooth','max_strange_input_data_allowance')
 
         # Declare the BT LED
         self.led = Led(btLedPin)
@@ -46,6 +47,7 @@ class ServerBluetoothThread (threading.Thread):
         self._keepRunning = True
         self.cmdQueue = queue.Queue()
         self._currentAttempts = 0
+        self._currentSuspiciousPoints = 0
 
 
     ############################################################################
@@ -94,10 +96,9 @@ class ServerBluetoothThread (threading.Thread):
             logging.error("Failed to retreive message. Details: {0}".format(error))
             self._CloseClientSocket()
         else:
-            encryptedMsg = encryptedMsgBytes.decode("UTF-8") # this msg can be either encrypted or not
+            encryptedMsg = encryptedMsgBytes.decode("UTF-8")
             msg = Encryption.DecryptMessage(encryptedMsg)
-            if(msg is not None): return msg
-            else: return None
+            return msg
 
 
     ############################################################################
@@ -116,7 +117,7 @@ class ServerBluetoothThread (threading.Thread):
                     logging.error("Failed to send message. Details: {0}".format(error))
                     self._CloseClientSocket()
                 else: logging.debug("Message sent successfully.")
-                
+
         else: logging.error("The data received for sending is empty.")
 
 
@@ -158,6 +159,16 @@ class ServerBluetoothThread (threading.Thread):
         else:
             self._SendMessage("already logged in")
 
+    ############################################################################
+    # Function
+    ############################################################################
+    def _IsInputDataStrange(self, data:str=None) -> bool:
+
+        if(data is not None and data is not ""):
+            return False
+        else:
+            logging.warning("Received weird input data from the client.")
+            return True
 
     ############################################################################
     # Function
@@ -242,11 +253,18 @@ class ServerBluetoothThread (threading.Thread):
                 self.led.Blink()
                 self._WaitClientConnection() # If client is not connected, wait to connect back
                 self.led.ON()
+
             else:
-                # Wait for the client to send data
-                data = self._ReceiveMsg()
-                # Process the data received from client
-                self._ProcessInputData(data)
+                data = self._ReceiveMsg() # Wait for the client to send data
+
+                if(self._IsInputDataStrange(data)): # Check if the input data from client is weird
+                    self._currentSuspiciousPoints += 1
+                    if(self._currentSuspiciousPoints == self._maxStrangeInputDataAllowance):
+                        logging.warning("Disconnecting client due to too many weird input data received.")
+                        self._CloseClientSocket()
+                        self._currentSuspiciousPoints = 0
+
+                else: self._ProcessInputData(data) # Process the data received from client
 
 
         self._CloseClientSocket() # Close client socket
