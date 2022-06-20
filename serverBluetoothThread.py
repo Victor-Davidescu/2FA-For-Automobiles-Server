@@ -96,6 +96,7 @@ class ServerBluetoothThread (threading.Thread):
             logging.error("Failed to retreive message. Details: {0}".format(error))
             self._CloseClientSocket()
         else:
+            logging.debug("Received msg: {0}".format(encryptedMsgBytes.decode("UTF-8")))
             encryptedMsg = encryptedMsgBytes.decode("UTF-8")
             msg = Encryption.DecryptMessage(encryptedMsg)
             return msg
