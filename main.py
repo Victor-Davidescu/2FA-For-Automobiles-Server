@@ -5,6 +5,7 @@
 import RPi.GPIO as GPIO
 import time
 import logging
+import sys
 from config import Configurations
 from keypad import Keypad
 from relayModule import RelayModule
@@ -16,115 +17,129 @@ from led import Led
 ################################################################################
 class Main:
 
-    ############################################################################
-    # Class Constructor
-    ############################################################################
-    def __init__(self):
-        # Setup the GPIO
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+    # Global Variables
+    keepRunning:bool = True
+    loopDelay:int = 1
+    ledPower:Led = None
+    relaySwitch:RelayModule = None
+    bluetooth:ServerBluetoothThread = None
+    keypad:Keypad = None
 
-        # Get required configurations
+    ############################################################################
+    # Function
+    ############################################################################
+    def _InitLogging() -> None:
+        try:
+            logging.basicConfig(
+                level="DEBUG",
+                format="%(asctime)s | %(levelname)s | %(message)s",
+                datefmt="%H:%M:%S")
+                
+        except Exception as err:
+            logging.critical(err)
+            Main.Stop()
+
+    ############################################################################
+    # Function
+    ############################################################################
+    def _InitGPIO() -> None:
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+
+        except Exception as err:
+            logging.critical(err)
+            Main.Stop()
+
+    ############################################################################
+    # Function
+    ############################################################################
+    def _InitComponents() -> None:
         relayPin = Configurations.GetInt('gpio_pins','relay_pin')
         ledPowerPin = Configurations.GetInt('gpio_pins','led_power_pin')
 
-        # Declare instances
-        self.ledPower = Led(ledPowerPin)
-        self.relaySwitch = RelayModule(relayPin)
-        self.mainBT = ServerBluetoothThread()
-        self.mainKepad = Keypad()
+        if(relayPin and ledPowerPin):
+            Main.ledPower = Led(ledPowerPin)
+            Main.relaySwitch = RelayModule(relayPin)
+            Main.bluetooth = ServerBluetoothThread()
+            Main.keypad = Keypad()
 
-        # Declare other variables
-        self.keepRunning = True
-
-
-    ############################################################################
-    # Function
-    ############################################################################
-    def ProcessCMD(self, cmd:str):
-        """Process the received command."""
-
-        # Switch ON/OFF the relay
-        if(cmd == "switch"):
-            self.relaySwitch.Switch()
-
-        # Shutdown program
-        elif(cmd == "shutdown"):
-            if(not self.mainBT.clientConnected):
-                self.Stop()
-            else:
-                logging.error("Cannot shutdown, because there is an active BT connection.")
-
-        else: logging.debug("Unkown command received.")
-
+        else:
+            logging.critical("Relay pin and/or Power led pin is 'None'.")
+            Main.Stop()
 
     ############################################################################
     # Function
     ############################################################################
-    def CheckCMDQueue(self, queueFromBT:bool):
-        cmd = None
-        # Get cmds from BT queue if requested and available
-        if(queueFromBT and not self.mainBT.cmdQueue.empty()):
-            cmd = self.mainBT.cmdQueue.get()
-            self.mainBT.cmdQueue.task_done()
+    def _StartComponents() -> None:
+        Main.relaySwitch.TurnOFF() # Turn off (lock) the relay switch
+        Main.ledPower.start() # Start the thread for power led
+        Main.ledPower.ON() # Turn on the power led
+        Main.bluetooth.start() # Start thread for bluetooth connection
+        Main.keypad.start() # Start thread for keypad
 
-        # Get cmds from keypad queue if requested and available
-        if(not queueFromBT and not self.mainKepad.cmdQueue.empty()):
-            cmd = self.mainKepad.cmdQueue.get()
-            self.mainKepad.cmdQueue.task_done()
+    ############################################################################
+    # Function | Proccess the recived command
+    ############################################################################
+    def _ProcessCMD(cmd:str = None) -> None:
+        if(cmd):
+            if(cmd == "switch"): # Switch ON/OFF the relay
+                Main.relaySwitch.Switch()
 
-        return cmd
+            elif(cmd == "shutdown"): # Shutdown program
+                if(not Main.bluetooth.clientConnected):
+                    Main.Stop()
 
+                else: logging.error("Cannot shutdown, because there is an active BT connection.")
+            else: logging.warning("Unkown command received. {0}".format(cmd))
+        else: logging.error("Received command 'None' for processing.")
 
     ############################################################################
     # Function
     ############################################################################
-    def Stop(self):
-        self.keepRunning = False
-        self.mainBT.Stop()
-        self.mainBT.join()
-        self.mainKepad.Stop()
-        self.mainKepad.join()
-        self.ledPower.Stop()
-        self.ledPower.join()
-
+    def _CheckCmdQueueFromBT() -> None:
+        if(not Main.bluetooth.cmdQueue.empty()):
+            Main._ProcessCMD(Main.bluetooth.cmdQueue.get())
+            Main.bluetooth.cmdQueue.task_done()
 
     ############################################################################
     # Function
     ############################################################################
-    def Main(self):
-        self.relaySwitch.TurnOFF() # Turn off (lock) the relay switch
-        self.ledPower.start() # Start the thread for power led
-        self.ledPower.ON() # Turn on the power led
-        self.mainBT.start() # Start thread for bluetooth connection
-        self.mainKepad.start() # Start thread for keypad
+    def _CheckCmdQueueFromKeypad() -> None:
+        if(not Main.keypad.cmdQueue.empty()):
+            Main._ProcessCMD(Main.keypad.cmdQueue.get())
+            Main.keypad.cmdQueue.task_done()
 
-        # Start main loop
-        while(self.keepRunning):
-            time.sleep(1)
+    ############################################################################
+    # Function
+    ############################################################################
+    def Stop() -> None:
+        Main.keepRunning = False
+        Main.bluetooth.Stop() # Stop & wait for bluetooth
+        Main.bluetooth.join()
+        Main.keypad.Stop() # Stop & wait for keypad
+        Main.keypad.join()
+        Main.ledPower.Stop() # Stop & wait for power led
+        Main.ledPower.join()
 
-            # Check and process any command from keypad
-            cmd = self.CheckCMDQueue(False)
-            if(cmd is not None):
-                self.ProcessCMD(cmd)
+    ############################################################################
+    # Function
+    ############################################################################
+    def Start() -> None:
+        Main._InitLogging()
+        Main._InitGPIO()
+        Main._InitComponents()
+        Main._StartComponents()
 
-            # Check and process any command from BT
-            cmd = self.CheckCMDQueue(True)
-            if(cmd is not None):
-                self.ProcessCMD(cmd)
+        while(Main.keepRunning): # Main Loop
+            time.sleep(Main.loopDelay) # Time delay
+            Main._CheckCmdQueueFromBT()
+            Main._CheckCmdQueueFromKeypad()
 
-        # Clean the GPIO
-        GPIO.cleanup()
-
+        GPIO.cleanup() # Clean the GPIO
+        sys.exit(0) # Close the program
 
 ################################################################################
 #   STARTING POINT
 ################################################################################
-if __name__ == "__main__":
-    logging.basicConfig(
-        level="DEBUG",
-        format="%(asctime)s | %(levelname)s | %(message)s",
-        datefmt="%H:%M:%S")
-
-    main = Main()
-    main.Main()
+if __name__ == "__main__": Main.Start()
