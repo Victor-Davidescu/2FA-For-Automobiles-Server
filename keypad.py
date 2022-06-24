@@ -212,6 +212,7 @@ class Keypad (threading.Thread):
 
         self.lcd.lcd_clear() # Clean the LCD
         self.lcd.backlight(1) # Turn ON the LCD backlight
+        self.buzzer.Beep(noOfBeeps=2)
         self.lcd.lcd_display_string("System Active",1)
         self.lcd.lcd_display_string("Press A to login",2)
 
