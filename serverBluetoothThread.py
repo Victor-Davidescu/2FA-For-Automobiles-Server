@@ -260,10 +260,12 @@ class ServerBluetoothThread (threading.Thread):
 
                 if(self._IsInputDataStrange(data)): # Check if the input data from client is weird
                     self._currentSuspiciousPoints += 1
+
                     if(self._currentSuspiciousPoints == self._maxStrangeInputDataAllowance):
                         logging.warning("Disconnecting client due to too many weird input data received.")
                         self._CloseClientSocket()
-                        self._currentSuspiciousPoints = 0
+                        self.cmdQueue.put("stopBT")
+                        self.Stop()
 
                 else: self._ProcessInputData(data) # Process the data received from client
 

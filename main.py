@@ -2,6 +2,7 @@
 # Author: Victor Davidescu
 # SID: 1705734
 ################################################################################
+from xmlrpc.client import Boolean
 import RPi.GPIO as GPIO
 import time
 import logging
@@ -25,6 +26,7 @@ class Main:
     bluetooth:ServerBluetoothThread = None
     keypad:Keypad = None
 
+
     ############################################################################
     # Function
     ############################################################################
@@ -34,10 +36,11 @@ class Main:
                 level="DEBUG",
                 format="%(asctime)s | %(levelname)s | %(message)s",
                 datefmt="%H:%M:%S")
-                
+
         except Exception as err:
             logging.critical(err)
             Main.Stop()
+
 
     ############################################################################
     # Function
@@ -50,6 +53,7 @@ class Main:
         except Exception as err:
             logging.critical(err)
             Main.Stop()
+
 
     ############################################################################
     # Function
@@ -68,6 +72,7 @@ class Main:
             logging.critical("Relay pin and/or Power led pin is 'None'.")
             Main.Stop()
 
+
     ############################################################################
     # Function
     ############################################################################
@@ -78,21 +83,22 @@ class Main:
         Main.bluetooth.start() # Start thread for bluetooth connection
         Main.keypad.start() # Start thread for keypad
 
+
     ############################################################################
     # Function | Proccess the recived command
     ############################################################################
     def _ProcessCMD(cmd:str = None) -> None:
         if(cmd):
-            if(cmd == "switch"): # Switch ON/OFF the relay
-                Main.relaySwitch.Switch()
-
-            elif(cmd == "shutdown"): # Shutdown program
-                if(not Main.bluetooth.clientConnected):
-                    Main.Stop()
-
+            if(cmd == "switch"): Main.relaySwitch.Switch()
+            elif(cmd == "stopBT"): Main.StopBluetooth()
+            elif(cmd == "startBT"): Main.StartBluetooth()
+            elif(cmd == "shutdown"):
+                if(not Main.bluetooth.clientConnected): Main.Stop()
                 else: logging.error("Cannot shutdown, because there is an active BT connection.")
+
             else: logging.warning("Unkown command received. {0}".format(cmd))
         else: logging.error("Received command 'None' for processing.")
+
 
     ############################################################################
     # Function
@@ -102,6 +108,7 @@ class Main:
             Main._ProcessCMD(Main.bluetooth.cmdQueue.get())
             Main.bluetooth.cmdQueue.task_done()
 
+
     ############################################################################
     # Function
     ############################################################################
@@ -109,6 +116,23 @@ class Main:
         if(not Main.keypad.cmdQueue.empty()):
             Main._ProcessCMD(Main.keypad.cmdQueue.get())
             Main.keypad.cmdQueue.task_done()
+
+
+    ############################################################################
+    # Function
+    ############################################################################
+    def StopBluetooth() -> None:
+        Main.bluetooth.Stop() # Stop & wait for bluetooth
+        Main.bluetooth.join()
+
+
+    ############################################################################
+    # Function
+    ############################################################################
+    def StartBluetooth() -> None:
+        Main.bluetooth = ServerBluetoothThread()
+        Main.bluetooth.start() # Start thread for bluetooth connection
+
 
     ############################################################################
     # Function

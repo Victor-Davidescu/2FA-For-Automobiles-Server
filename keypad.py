@@ -170,7 +170,12 @@ class Keypad (threading.Thread):
             self.lcd.lcd_display_string("Relay switched", 1)
             self.buzzer.Beep()
             self.cmdQueue.put("switch")
-        else: logging.debug("Switch command denied.")
+        else:
+            logging.debug("Switch command denied.")
+            self.lcd.lcd_clear()
+            self.lcd.lcd_display_string("Command Denied",1)
+            self.lcd.lcd_display_string("Press A to login",2)
+            self.buzzer.Beep(longBeep=True)
 
 
     ############################################################################
@@ -188,13 +193,42 @@ class Keypad (threading.Thread):
     ############################################################################
     # Function
     ############################################################################
+    def _KeyFunctionStar(self):
+        if(self._userAuthenticated):
+            logging.debug("User requested to start bluetooth")
+            self.lcd.lcd_clear()
+            self.lcd.lcd_display_string("Bluetooth ON",1)
+            self.buzzer.Beep()
+            self.cmdQueue.put("startBT")
+        else:
+            logging.debug("Stop BT command denied.")
+            self.lcd.lcd_clear()
+            self.lcd.lcd_display_string("Command Denied",1)
+            self.lcd.lcd_display_string("Press A to login",2)
+            self.buzzer.Beep(longBeep=True)
+
+
+    ############################################################################
+    # Function
+    ############################################################################
+    def _KeyFunctionDash(self):
+        logging.debug("User requested to stop bluetooth")
+        self.lcd.lcd_clear()
+        self.lcd.lcd_display_string("Bluetooth OFF",1)
+        self.buzzer.Beep()
+        self.cmdQueue.put("stopBT")
+
+
+    ############################################################################
+    # Function
+    ############################################################################
     def _ProcessKey(self, key):
         if(key == 'A'): self._KeyFunctionA() # Login/Logout Key
         elif(key=='B'): self._KeyFunctionB() # Lock/Unlock Key
         elif(key=='C'): self._KeyFunctionC() # Shutdown Key
         elif(key=='D'): pass # Nothing assigned here, yet?
-        elif(key=='*'): pass # Nothing assigned here, yet?
-        elif(key=='#'): pass # Nothing assigned here, yet?
+        elif(key=='*'): self._KeyFunctionStar() # Start Bluetooth
+        elif(key=='#'): self._KeyFunctionDash() # Stop Bluetooth
 
 
     ############################################################################
