@@ -2,7 +2,10 @@
 # Author: Victor Davidescu
 # SID: 1705734
 #
-# Code based on: https://github.com/ijl20/python_java_crypto
+# Code Reference:
+# Lewis, R., 2019. Compatible AES encrypt/decrypt in Python and Java. [online]
+# Available at: <https://github.com/ijl20/python_java_crypto> [Accessed 20 July 2022].
+#
 ################################################################################
 from config import Configurations
 from Crypto.Cipher import AES

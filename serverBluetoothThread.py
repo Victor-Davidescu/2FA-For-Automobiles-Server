@@ -28,7 +28,7 @@ class ServerBluetoothThread (threading.Thread):
         socketTimeout = Configurations.GetInt('bluetooth', 'socket_timeout_seconds')
         self._maxLoginAttempts = Configurations.GetInt('bluetooth', 'max_login_attempts')
         btLedPin = Configurations.GetInt('gpio_pins', 'led_bluetooth_pin')
-        self._maxStrangeInputDataAllowance = Configurations.GetInt('bluetooth','max_strange_input_data_allowance')
+        self._maxStrangePoints = Configurations.GetInt('bluetooth','max_strange_input_data_allowance')
 
         # Declare the BT LED
         self.led = Led(btLedPin)
@@ -47,7 +47,7 @@ class ServerBluetoothThread (threading.Thread):
         self._keepRunning = True
         self.cmdQueue = queue.Queue()
         self._currentAttempts = 0
-        self._currentSuspiciousPoints = 0
+        self._suspicionPoints = 0
 
 
     ############################################################################
@@ -90,14 +90,13 @@ class ServerBluetoothThread (threading.Thread):
     # Function
     ############################################################################
     def _ReceiveMsg(self) -> str:
-
         try: encryptedMsgBytes:bytes = self._clientSocket.recv(1024)
         except Exception as error:
             logging.error("Failed to retreive message. Details: {0}".format(error))
             self._CloseClientSocket()
         else:
-            logging.debug("Received msg: {0}".format(encryptedMsgBytes.decode("UTF-8")))
             encryptedMsg = encryptedMsgBytes.decode("UTF-8")
+            logging.debug("Received msg: {0}".format(encryptedMsg))
             msg = Encryption.DecryptMessage(encryptedMsg)
             return msg
 
@@ -160,45 +159,36 @@ class ServerBluetoothThread (threading.Thread):
         else:
             self._SendMessage("already logged in")
 
+
     ############################################################################
     # Function
     ############################################################################
-    def _IsInputDataStrange(self, data:str=None) -> bool:
+    def _ProcessMsg(self, msg:str) -> None:
 
-        if(data is not None and data is not ""):
-            return False
+        if(msg is None):
+            logging.warning("Strange message received. Message: {0}".format(msg))
+            self._suspicionPoints += 1
+
+        elif(msg == "disconnect"):
+            self._SendMessage("disconnected")
+            self._CloseClientSocket()
+
+        elif(msg.startswith("login")):
+            self._AuthenticateClient(msg)
+
+        elif(msg == "logout"):
+            self._clientAuthenticated = False
+            self._SendMessage("logged out")
+
+        elif(msg == "switch"):
+            if(self._clientAuthenticated):
+                self.cmdQueue.put(msg)
+                self._SendMessage("command '{0}' received".format(msg))
+
         else:
-            logging.warning("Received weird input data from the client.")
-            return True
+            logging.warning("Strange message received. Message: {0}".format(msg))
+            self._suspicionPoints += 1
 
-    ############################################################################
-    # Function
-    ############################################################################
-    def _ProcessInputData(self, data:str=None):
-
-        if(data is not None):
-            if(data == "disconnect"):
-                self._CloseClientSocket()
-
-            elif(data.startswith("login")):
-                self._AuthenticateClient(data)
-
-            elif(data == "logout"):
-                self._clientAuthenticated = False
-                self._SendMessage("logged out")
-
-            elif(data == "shutdown"):
-                if(self._clientAuthenticated):
-                    self._keepRunning = False
-                    self.cmdQueue.put(data)
-                    self._SendMessage("shutting down")
-                else: self._SendMessage("unauthorised command")
-
-            else:
-                if(self._clientAuthenticated):
-                    self.cmdQueue.put(data)
-                    self._SendMessage("command '{0}' received".format(data))
-                else: self._SendMessage("unauthorised command")
 
     ############################################################################
     # Function
@@ -249,26 +239,23 @@ class ServerBluetoothThread (threading.Thread):
         # Start the main thread loop
         while(self._keepRunning):
 
-            # Check if a client is connected
-            if(not self.clientConnected):
-                self.led.Blink()
-                self._WaitClientConnection() # If client is not connected, wait to connect back
-                self.led.ON()
+            # Check if the max strange points is reached
+            if(self._suspicionPoints < self._maxStrangePoints):
+
+                # Check if a client is connected
+                if(not self.clientConnected):
+                    self.led.Blink()
+                    self._WaitClientConnection() # If client is not connected, wait to connect back
+                    self.led.ON()
+                else:
+                    msg = self._ReceiveMsg() # Wait for the client to send data
+                    self._ProcessMsg(msg) # Process the data received from client
 
             else:
-                data = self._ReceiveMsg() # Wait for the client to send data
-
-                if(self._IsInputDataStrange(data)): # Check if the input data from client is weird
-                    self._currentSuspiciousPoints += 1
-
-                    if(self._currentSuspiciousPoints == self._maxStrangeInputDataAllowance):
-                        logging.warning("Disconnecting client due to too many weird input data received.")
-                        self._CloseClientSocket()
-                        self.cmdQueue.put("stopBT")
-                        self.Stop()
-
-                else: self._ProcessInputData(data) # Process the data received from client
-
+                logging.warning("Disconnecting client due to too many weird input data received.")
+                self._CloseClientSocket()
+                self.cmdQueue.put("stopBT")
+                self.Stop()
 
         self._CloseClientSocket() # Close client socket
         self._CloseServerSocket() # Close server socket
