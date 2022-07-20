@@ -15,7 +15,7 @@ from encryption import Encryption
 ################################################################################
 # Class Bluetooth handler
 ################################################################################
-class ServerBluetoothThread (threading.Thread):
+class BluetoothHandler (threading.Thread):
 
     ############################################################################
     # Class Constructor

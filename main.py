@@ -2,15 +2,14 @@
 # Author: Victor Davidescu
 # SID: 1705734
 ################################################################################
-from xmlrpc.client import Boolean
 import RPi.GPIO as GPIO
 import time
 import logging
 import sys
 from config import Configurations
 from keypad import Keypad
-from relayModule import RelayModule
-from serverBluetoothThread import ServerBluetoothThread
+from relay import RelayModule
+from bluetooth_handler import BluetoothHandler
 from led import Led
 
 ################################################################################
@@ -23,7 +22,7 @@ class Main:
     loopDelay:int = 1
     ledPower:Led = None
     relaySwitch:RelayModule = None
-    bluetooth:ServerBluetoothThread = None
+    bluetooth:BluetoothHandler = None
     keypad:Keypad = None
 
 
@@ -65,7 +64,7 @@ class Main:
         if(relayPin and ledPowerPin):
             Main.ledPower = Led(ledPowerPin)
             Main.relaySwitch = RelayModule(relayPin)
-            Main.bluetooth = ServerBluetoothThread()
+            Main.bluetooth = BluetoothHandler()
             Main.keypad = Keypad()
 
         else:
@@ -130,7 +129,7 @@ class Main:
     # Function
     ############################################################################
     def StartBluetooth() -> None:
-        Main.bluetooth = ServerBluetoothThread()
+        Main.bluetooth = BluetoothHandler()
         Main.bluetooth.start() # Start thread for bluetooth connection
 
 
