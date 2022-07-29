@@ -32,7 +32,7 @@ class Authentication():
         pinHashed = hashlib.sha256(salt.encode() + pin.encode()  + self.pepper.encode())
 
         # Append user in the database
-        self.database.CreateUser(name, salt, pinHashed.hexdigest())
+        self.database.InsertUserInDB(name, salt, pinHashed.hexdigest())
 
 
     ############################################################################

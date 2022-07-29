@@ -107,11 +107,11 @@ class Keypad (threading.Thread):
             while(loop and self._keepRunning):
                 key = self._ReadKey() # Wait for user to enter a key
                 self.buzzer.Beep()
-                if(key == 'A'): # A for cancelling authentication
+                if(key == 'A'): # A for confirming pin
                     logging.debug("Keypad: PIN received")
                     pinConfirmed = True
                     loop = False
-                elif(key == 'B'): # B for confirming PIN
+                elif(key == 'B'): # B for cancelling PIN
                     logging.debug("Keypad: Authentication cancelled")
                     self.lcd.lcd_display_string("Login cancelled", 1)
                     loop = False
